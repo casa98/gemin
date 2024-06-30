@@ -27,21 +27,24 @@ class PlatformChannelExample extends StatefulWidget {
 }
 
 class _PlatformChannelExampleState extends State<PlatformChannelExample> {
-  static const platform = MethodChannel('com.casa98/platform_channel');
+  static const _methodChannel = MethodChannel('com.casa98/platform_channel');
+  static const EventChannel _eventChannel = EventChannel('com.casa98/battery');
 
   List<AppInfo> _installedApps = [];
   String _launchResult = 'No app launched yet.';
+  int _batteryLevel = -1;
 
   @override
   void initState() {
     super.initState();
     _getInstalledApps();
+    _startListeningBatteryLevel();
   }
 
   Future<void> _getInstalledApps() async {
     try {
       final List<dynamic> result =
-          await platform.invokeMethod('getInstalledApps');
+          await _methodChannel.invokeMethod('getInstalledApps');
       setState(() {
         _installedApps = result.map((app) {
           final Map<String, dynamic> appMap =
@@ -63,8 +66,8 @@ class _PlatformChannelExampleState extends State<PlatformChannelExample> {
 
   Future<void> _launchApp(String packageName) async {
     try {
-      final String result =
-          await platform.invokeMethod('launchApp', {'package': packageName});
+      final String result = await _methodChannel
+          .invokeMethod('launchApp', {'package': packageName});
       setState(() {
         _launchResult = result;
       });
@@ -73,6 +76,21 @@ class _PlatformChannelExampleState extends State<PlatformChannelExample> {
         _launchResult = 'Failed to launch app: ${e.message}';
       });
     }
+  }
+
+  void _startListeningBatteryLevel() {
+    _eventChannel.receiveBroadcastStream().listen(
+      (event) {
+        setState(() {
+          _batteryLevel = event as int;
+        });
+      },
+      onError: (error) {
+        setState(() {
+          _batteryLevel = -1;
+        });
+      },
+    );
   }
 
   @override
@@ -94,6 +112,13 @@ class _PlatformChannelExampleState extends State<PlatformChannelExample> {
                     onTap: () => _launchApp(_installedApps[index].packageName),
                   );
                 },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                'Battery Level: $_batteryLevel%',
+                style: const TextStyle(fontSize: 24),
               ),
             ),
             Text(_launchResult),
